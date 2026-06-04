@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Drive Player Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#07070f; --s1:#0d0d1b; --s2:#12121e; --s3:#181828;
+  --bd:#252538; --bd2:#32324a;
+  --ac:#7c6aff; --ac2:#ff4d8d; --ac3:#00e0aa;
+  --tx:#ededfa; --tx2:#8888a8; --tx3:#44445a;
+  --r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;background:var(--bg);color:var(--tx);font-family:'Outfit',sans-serif}
+
+/* ── TAB BAR ── */
+.tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:100}
+.tab{flex:1;padding:13px 4px 11px;text-align:center;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .2s;user-select:none}
+.tab svg{display:block;margin:0 auto 3px;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--ac);border-bottom-color:var(--ac)}
+.page{display:none;min-height:calc(100dvh - 48px)}
+.page.on{display:block}
+
+/* ══════════════════════════════
+   PLAYER PAGE
+══════════════════════════════ */
+
+/* Video shell */
+.vshell{position:relative;width:100%;background:#000;aspect-ratio:16/9;overflow:hidden;touch-action:none}
+.vshell video,.vshell iframe{position:absolute;inset:0;width:100%;height:100%;border:none;display:block}
+.vshell iframe{display:none}
+
+/* Placeholder */
+.vph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#000;z-index:5;pointer-events:none}
+.vph-icon{width:64px;height:64px;border-radius:50%;background:rgba(124,106,255,.1);border:1.5px solid rgba(124,106,255,.3);display:flex;align-items:center;justify-content:center}
+.vph-icon svg{width:26px;height:26px;fill:var(--ac);margin-left:3px}
+.vph p{font-size:.8rem;color:var(--tx3);text-align:center;padding:0 24px}
+
+/* Overlay controls (tap to show/hide) */
+.overlay{
+  position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
+  justify-content:space-between;
+  background:linear-gradient(to bottom, rgba(0,0,0,.5) 0%, transparent 30%, transparent 60%, rgba(0,0,0,.7) 100%);
+  opacity:0;transition:opacity .25s;pointer-events:none;
+}
+.overlay.vis{opacity:1;pointer-events:all}
+.ov-top{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 12px}
+.ov-title{font-size:.82rem;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-right:8px}
+.ov-btn{
+  width:32px;height:32px;border-radius:8px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:background .15s;flex-shrink:0;color:#fff;font-size:14px
+}
+.ov-btn:active{background:rgba(124,106,255,.5)}
+.ov-mid{display:flex;align-items:center;justify-content:center;gap:28px}
+.ctrl-big{
+  width:52px;height:52px;border-radius:50%;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);
+  border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s
+}
+.ctrl-big:active{transform:scale(.92);background:rgba(124,106,255,.4)}
+.ctrl-big svg{width:22px;height:22px;fill:#fff}
+.ctrl-big.play-btn svg{margin-left:3px}
+.ctrl-sm{
+  width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.4);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s
+}
+.ctrl-sm:active{transform:scale(.9);background:rgba(124,106,255,.35)}
+.ctrl-sm svg{width:17px;height:17px;fill:#fff}
+
+.ov-bot{padding:6px 12px 10px}
+/* Progress bar */
+.prog-wrap{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.prog-time{font-size:.68rem;color:rgba(255,255,255,.85);white-space:nowrap;min-width:36px}
+.prog-bar{flex:1;height:3px;background:rgba(255,255,255,.2);border-radius:3px;position:relative;cursor:pointer;padding:8px 0;margin:-8px 0}
+.prog-bar-inner{position:absolute;top:50%;transform:translateY(-50%);left:0;height:3px;background:var(--ac);border-radius:3px;width:0%;transition:width .1s linear;pointer-events:none}
+.prog-thumb{position:absolute;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px var(--ac);left:0%;pointer-events:none;transition:left .1s linear}
+/* Bottom controls row */
+.bot-row{display:flex;align-items:center;gap:8px}
+.vol-wrap{display:flex;align-items:center;gap:6px;flex:1}
+.vol-icon{color:rgba(255,255,255,.7);font-size:14px;cursor:pointer;flex-shrink:0}
+.vol-bar{flex:1;height:3px;background:rgba(255,255,255,.2);border-radius:3px;position:relative;cursor:pointer;padding:8px 0;margin:-8px 0}
+.vol-inner{position:absolute;top:50%;transform:translateY(-50%);left:0;height:3px;background:rgba(255,255,255,.7);border-radius:3px;width:100%;pointer-events:none}
+.speed-btn{padding:3px 8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:5px;color:#fff;font-size:.7rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Outfit',sans-serif}
+.speed-btn:active{background:rgba(124,106,255,.4)}
+.fs-btn{color:rgba(255,255,255,.8);font-size:16px;cursor:pointer;flex-shrink:0;padding:2px}
+
+/* Now playing bar */
+.np-bar{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--s2);border-bottom:1px solid var(--bd)}
+.np-dot{width:6px;height:6px;border-radius:50%;background:var(--ac2);flex-shrink:0;animation:blink 1.3s ease-in-out infinite}
+.np-dot.off{background:var(--bd2);animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.np-info{flex:1;overflow:hidden}
+.np-label{font-size:.6rem;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em}
+.np-title{font-size:.86rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-mode{font-size:.65rem;color:var(--tx3);padding:2px 7px;background:var(--s3);border:1px solid var(--bd);border-radius:6px;white-space:nowrap}
+
+/* Fallback notice */
+.fallback-notice{
+  display:none;margin:10px 14px 0;padding:10px 13px;
+  background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.25);border-radius:10px;
+  font-size:.75rem;color:#ffb347;line-height:1.5
+}
+
+/* Cards */
+.card{margin:12px 13px;padding:15px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r)}
+.card-hd{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--tx3);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.card-hd::before{content:'';width:3px;height:11px;background:var(--ac);border-radius:2px;display:block}
+.inp{width:100%;padding:10px 12px;background:var(--s1);border:1px solid var(--bd);border-radius:9px;color:var(--tx);font-family:'Outfit',sans-serif;font-size:.87rem;outline:none;margin-bottom:8px;transition:border .2s,box-shadow .2s}
+.inp:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(124,106,255,.13)}
+.inp::placeholder{color:var(--tx3)}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.btn{flex:1;padding:11px 8px;border:none;border-radius:9px;font-family:'Outfit',sans-serif;font-size:.84rem;font-weight:600;cursor:pointer;transition:all .18s;display:flex;align-items:center;justify-content:center;gap:5px}
+.btn:active{transform:scale(.97)}
+.b-play{background:linear-gradient(135deg,var(--ac),#9c7aff);color:#fff}
+.b-add{background:rgba(0,224,170,.1);color:var(--ac3);border:1px solid rgba(0,224,170,.22)}
+.hint{font-size:.7rem;color:var(--tx3);line-height:1.55}
+
+/* History */
+.hlist{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.hi{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--s1);border:1px solid var(--bd);border-radius:9px;cursor:pointer;transition:all .15s}
+.hi:active{border-color:var(--ac);background:rgba(124,106,255,.07)}
+.hi-ico{font-size:15px;flex-shrink:0}
+.hi-info{flex:1;overflow:hidden}
+.hi-name{font-size:.83rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hi-time{font-size:.67rem;color:var(--tx3);margin-top:1px}
+.hdel{padding:5px 8px;background:transparent;border:none;color:var(--tx3);cursor:pointer;border-radius:6px;font-size:.8rem;flex-shrink:0}
+.hdel:active{color:#ff6b6b}
+.empty{text-align:center;padding:28px 20px;color:var(--tx3);font-size:.82rem}
+.empty .ei{font-size:32px;margin-bottom:10px;opacity:.3}
+
+/* ══════════════════════════════
+   PLAYLIST PAGE
+══════════════════════════════ */
+.plpage{padding:13px}
+.pltop{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.pltop h2{font-size:1rem;font-weight:700;flex:1}
+.plbadge{background:rgba(124,106,255,.15);color:var(--ac);font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid rgba(124,106,255,.25)}
+.plact{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px}
+.plact::-webkit-scrollbar{display:none}
+.smbtn{padding:7px 12px;border:1px solid var(--bd2);border-radius:8px;background:var(--s2);color:var(--tx2);font-family:'Outfit',sans-serif;font-size:.75rem;cursor:pointer;white-space:nowrap;transition:all .15s}
+.smbtn:active{border-color:var(--ac);color:var(--ac)}
+.smbtn.red{color:#ff6b6b;border-color:rgba(255,107,107,.2)}
+.smbtn.red:active{background:rgba(255,107,107,.1)}
+
+/* Import box */
+.impbox{background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:12px;display:none}
+.impbox textarea{width:100%;padding:10px 12px;background:var(--s1);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-family:monospace;font-size:.75rem;height:90px;resize:none;outline:none;margin-bottom:9px}
+.impbox textarea:focus{border-color:var(--ac)}
+.impbox .ibrow{display:flex;gap:7px}
+
+.pllist{display:flex;flex-direction:column;gap:7px}
+.pli{display:flex;align-items:center;gap:9px;padding:11px 12px;background:var(--s2);border:1px solid var(--bd);border-radius:11px;cursor:pointer;transition:all .15s}
+.pli:active{transform:scale(.99)}
+.pli.on{background:rgba(124,106,255,.1);border-color:rgba(124,106,255,.35)}
+.pli-num{width:27px;height:27px;border-radius:7px;background:var(--s1);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--tx3);flex-shrink:0}
+.pli.on .pli-num{background:var(--ac);color:#fff}
+.eq{display:flex;align-items:flex-end;justify-content:center;gap:2px;padding:0 4px;background:var(--ac);border-radius:7px}
+.eqb{width:3px;background:#fff;border-radius:2px;animation:eqa .7s ease-in-out infinite alternate}
+.eqb:nth-child(1){height:8px;animation-delay:0s}
+.eqb:nth-child(2){height:14px;animation-delay:.18s}
+.eqb:nth-child(3){height:9px;animation-delay:.35s}
+@keyframes eqa{0%{transform:scaleY(.25)}100%{transform:scaleY(1)}}
+.pli-info{flex:1;overflow:hidden}
+.pli-name{font-size:.86rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pli-url{font-size:.68rem;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.plidel{padding:6px 9px;background:transparent;border:none;color:var(--tx3);font-size:.85rem;cursor:pointer;border-radius:7px;flex-shrink:0}
+.plidel:active{color:#ff6b6b}
+
+/* ══════════════════════════════
+   SETTINGS PAGE
+══════════════════════════════ */
+.setpage{padding:13px}
+.setsec{background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.sethd{padding:11px 15px;border-bottom:1px solid var(--bd);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--tx3)}
+.setrow{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;border-bottom:1px solid var(--bd);gap:10px}
+.setrow:last-child{border-bottom:none}
+.setlabel{font-size:.87rem;font-weight:500}
+.setsub{font-size:.7rem;color:var(--tx3);margin-top:2px}
+/* Toggle */
+.tgl{position:relative;width:42px;height:23px;flex-shrink:0;cursor:pointer}
+.tgl input{opacity:0;width:0;height:0}
+.tsl{position:absolute;inset:0;background:var(--bd2);border-radius:12px;transition:background .2s}
+.tsl::before{content:'';position:absolute;width:17px;height:17px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s}
+.tgl input:checked ~ .tsl{background:var(--ac)}
+.tgl input:checked ~ .tsl::before{transform:translateX(19px)}
+/* Colors */
+.colors{display:flex;gap:8px;flex-wrap:wrap}
+.copt{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.copt.on{border-color:#fff;transform:scale(1.18)}
+/* Speed options */
+.speed-opts{display:flex;gap:6px;flex-wrap:wrap}
+.spopt{padding:5px 11px;border:1px solid var(--bd2);border-radius:20px;background:transparent;color:var(--tx2);font-family:'Outfit',sans-serif;font-size:.75rem;cursor:pointer;transition:all .15s}
+.spopt.on{background:var(--ac);border-color:var(--ac);color:#fff}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--s3);border:1px solid var(--bd2);border-radius:10px;padding:10px 18px;font-size:.82rem;font-weight:500;z-index:999;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;opacity:0;white-space:nowrap;max-width:88vw;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{border-color:rgba(0,224,170,.3);color:var(--ac3)}
+.toast.err{border-color:rgba(255,77,141,.3);color:#ff6b9d}
+.toast.warn{border-color:rgba(255,180,0,.3);color:#ffcc44}
+
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab on" id="t-player" onclick="goTab('player')">
+    <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>Player
+  </div>
+  <div class="tab" id="t-playlist" onclick="goTab('playlist')">
+    <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>Playlist
+  </div>
+  <div class="tab" id="t-settings" onclick="goTab('settings')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings
+  </div>
+</div>
+
+<!-- ══ PLAYER PAGE ══ -->
+<div class="page on" id="page-player">
+
+  <!-- Video shell -->
+  <div class="vshell" id="vshell">
+    <!-- Placeholder -->
+    <div class="vph" id="vph">
+      <div class="vph-icon">
+        <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+      </div>
+      <p>লিংক দিন অথবা Playlist থেকে বেছে নিন</p>
+    </div>
+
+    <!-- HTML5 video -->
+    <video id="vid" preload="metadata" playsinline webkit-playsinline
+      style="display:none;object-fit:contain"></video>
+
+    <!-- iframe fallback -->
+    <iframe id="ifrm" src="" allowfullscreen allow="autoplay;fullscreen"
+      style="display:none"></iframe>
+
+    <!-- Overlay -->
+    <div class="overlay" id="overlay">
+      <!-- Top -->
+      <div class="ov-top">
+        <div class="ov-title" id="ovTitle">—</div>
+        <div style="display:flex;gap:6px">
+          <div class="ov-btn" id="pipBtn" onclick="tryPiP()" title="Picture in Picture">⧉</div>
+          <div class="ov-btn" onclick="toggleFs()" title="Fullscreen">⛶</div>
+        </div>
+      </div>
+      <!-- Mid -->
+      <div class="ov-mid">
+        <div class="ctrl-sm" onclick="seekRel(-10)">
+          <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/><text x="8" y="20" font-size="7" fill="white" font-family="sans-serif">10</text></svg>
+        </div>
+        <div class="ctrl-big play-btn" id="playBtn" onclick="togglePlay()">
+          <svg id="playIco" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <div class="ctrl-sm" onclick="seekRel(10)">
+          <svg viewBox="0 0 24 24"><path d="M11.5 8c2.65 0 5.05.99 6.9 2.6L22 7v9h-9l3.62-3.62A7.718 7.718 0 0 0 11.5 10.5C7.96 10.5 4.95 12.81 3.9 16l-2.37-.78C2.92 11.03 6.85 8 11.5 8z"/><text x="8" y="20" font-size="7" fill="white" font-family="sans-serif">10</text></svg>
+        </div>
+      </div>
+      <!-- Bottom -->
+      <div class="ov-bot">
+        <div class="prog-wrap">
+          <span class="prog-time" id="curTime">0:00</span>
+          <div class="prog-bar" id="progBar" onclick="seekClick(event)">
+            <div class="prog-bar-inner" id="progFill"></div>
+            <div class="prog-thumb" id="progThumb"></div>
+          </div>
+          <span class="prog-time" id="durTime">0:00</span>
+        </div>
+        <div class="bot-row">
+          <div class="vol-wrap">
+            <span class="vol-icon" id="volIcon" onclick="toggleMute()">🔊</span>
+            <div class="vol-bar" id="volBar" onclick="volClick(event)">
+              <div class="vol-inner" id="volFill"></div>
+            </div>
+          </div>
+          <button class="speed-btn" id="speedLabel" onclick="cycleSpeed()">1×</button>
+          <span class="fs-btn" onclick="toggleFs()">⛶</span>
+        </div>
+      </div>
+    </div><!-- /overlay -->
+  </div><!-- /vshell -->
+
+  <!-- Now playing bar -->
+  <div class="np-bar">
+    <div class="np-dot off" id="npDot"></div>
+    <div class="np-info">
+      <div class="np-label">এখন চলছে</div>
+      <div class="np-title" id="npTitle">—</div>
+    </div>
+    <div class="np-mode" id="npMode">—</div>
+  </div>
+
+  <!-- Fallback notice -->
+  <div class="fallback-notice" id="fallbackNote">
+    ⚠️ Google Drive CORS block করেছে — <strong>iframe mode</strong> এ চলছে।
+    Controls সীমিত থাকবে। ভিডিও সরাসরি public করুন বা VLC/MX Player ব্যবহার করুন।
+  </div>
+
+  <!-- Input card -->
+  <div class="card">
+    <div class="card-hd">ভিডিও চালান</div>
+    <input class="inp" id="titleInp" placeholder="ভিডিওর নাম (ঐচ্ছিক)">
+    <input class="inp" id="linkInp" placeholder="Google Drive লিংক দিন…" autocomplete="off">
+    <div class="brow">
+      <button class="btn b-play" onclick="playNow()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+        চালান
+      </button>
+      <button class="btn b-add" onclick="addPL()">＋ Playlist</button>
+    </div>
+    <div class="hint">
+      drive.google.com/file/d/<b>FILE_ID</b>/view &nbsp;|&nbsp; open?id=<b>ID</b> &nbsp;|&nbsp; শুধু File ID
+    </div>
+  </div>
+
+  <!-- History card -->
+  <div class="card">
+    <div class="card-hd">সাম্প্রতিক ইতিহাস</div>
+    <div class="hlist" id="hlist"></div>
+  </div>
+
+</div><!-- /player page -->
+
+<!-- ══ PLAYLIST PAGE ══ -->
+<div class="page" id="page-playlist">
+  <div class="plpage">
+    <div class="pltop">
+      <h2>📋 Playlist</h2>
+      <span class="plbadge" id="plBadge">0 টি</span>
+    </div>
+    <div class="plact">
+      <button class="smbtn" onclick="exportPL()">↑ Export</button>
+      <button class="smbtn" onclick="showImp()">↓ Import</button>
+      <button class="smbtn" onclick="sortPL()">⇅ A–Z</button>
+      <button class="smbtn" onclick="shufflePL()">🔀 Shuffle</button>
+      <button class="smbtn red" onclick="clearPL()">🗑 মুছুন</button>
+    </div>
+    <div class="impbox" id="impbox">
+      <div class="card-hd" style="margin-bottom:8px">JSON Paste করুন</div>
+      <textarea id="impTA" placeholder='[{"title":"ভিডিও ১","url":"https://drive.google.com/..."},...]'></textarea>
+      <div class="ibrow">
+        <button class="smbtn" onclick="doImport()">Import</button>
+        <button class="smbtn" onclick="hideImp()">বাতিল</button>
+      </div>
+    </div>
+    <div class="pllist" id="pllist"></div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS PAGE ══ -->
+<div class="page" id="page-settings">
+  <div class="setpage">
+
+    <div class="setsec">
+      <div class="sethd">Playback</div>
+      <div class="setrow">
+        <div><div class="setlabel">Auto-next</div><div class="setsub">Playlist এ পরের ভিডিও চালু</div></div>
+        <label class="tgl"><input type="checkbox" id="cfgAutoNext" checked><span class="tsl"></span></label>
+      </div>
+      <div class="setrow">
+        <div><div class="setlabel">Loop</div><div class="setsub">একই ভিডিও বারবার</div></div>
+        <label class="tgl"><input type="checkbox" id="cfgLoop" onchange="applyLoop()"><span class="tsl"></span></label>
+      </div>
+      <div class="setrow">
+        <div><div class="setlabel">Autoplay on load</div><div class="setsub">লিংক দিলেই সাথে সাথে চালু</div></div>
+        <label class="tgl"><input type="checkbox" id="cfgAutoplay" checked><span class="tsl"></span></label>
+      </div>
+      <div class="setrow">
+        <div><div class="setlabel">Default Speed</div></div>
+        <div class="speed-opts" id="speedOpts">
+          <button class="spopt" onclick="setDefSpeed(.5,this)">.5×</button>
+          <button class="spopt" onclick="setDefSpeed(.75,this)">.75×</button>
+          <button class="spopt on" onclick="setDefSpeed(1,this)">1×</button>
+          <button class="spopt" onclick="setDefSpeed(1.25,this)">1.25×</button>
+          <button class="spopt" onclick="setDefSpeed(1.5,this)">1.5×</button>
+          <button class="spopt" onclick="setDefSpeed(2,this)">2×</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="setsec">
+      <div class="sethd">Appearance</div>
+      <div class="setrow">
+        <div><div class="setlabel">ইতিহাস সেভ করুন</div></div>
+        <label class="tgl"><input type="checkbox" id="cfgHist" checked><span class="tsl"></span></label>
+      </div>
+      <div class="setrow">
+        <div><div class="setlabel">Accent Color</div></div>
+        <div class="colors">
+          <div class="copt on" style="background:#7c6aff" onclick="setAc('#7c6aff',this)"></div>
+          <div class="copt" style="background:#ff4d8d" onclick="setAc('#ff4d8d',this)"></div>
+          <div class="copt" style="background:#00e0aa" onclick="setAc('#00e0aa',this)"></div>
+          <div class="copt" style="background:#ff9e2c" onclick="setAc('#ff9e2c',this)"></div>
+          <div class="copt" style="background:#3dd6f5" onclick="setAc('#3dd6f5',this)"></div>
+          <div class="copt" style="background:#e040fb" onclick="setAc('#e040fb',this)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="setsec">
+      <div class="sethd">Data</div>
+      <div class="setrow">
+        <div><div class="setlabel">Playlist Export</div><div class="setsub">JSON ফাইলে সেভ</div></div>
+        <button class="smbtn" onclick="exportPL()">Export</button>
+      </div>
+      <div class="setrow">
+        <div><div class="setlabel">ইতিহাস মুছুন</div></div>
+        <button class="smbtn red" onclick="clearHist()">মুছুন</button>
+      </div>
+      <div class="setrow">
+        <div><div class="setlabel">সব Reset</div><div class="setsub">Playlist + ইতিহাস</div></div>
+        <button class="smbtn red" onclick="resetAll()">Reset</button>
+      </div>
+    </div>
+
+    <div class="setsec">
+      <div class="sethd">About</div>
+      <div class="setrow">
+        <div><div class="setlabel">Drive Player Pro</div><div class="setsub">v3.0 — HTML5 + iframe hybrid</div></div>
+        <span style="opacity:.4">▶</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────
+let playlist=[], hist=[], activeIdx=-1;
+let currentMode='none'; // 'html5' | 'iframe' | 'none'
+let speeds=[.5,.75,1,1.25,1.5,2], speedIdx=2;
+let defSpeed=1;
+let overlayTimer=null;
+let isSeeking=false, isDragging=false;
+
+// ─── Tab switching ────────────────────────────────────
+function goTab(name){
+  ['player','playlist','settings'].forEach(n=>{
+    document.getElementById('t-'+n).classList.toggle('on', n===name);
+    document.getElementById('page-'+n).classList.toggle('on', n===name);
+  });
+  if(name==='playlist') renderPL();
+}
+
+// ─── Drive ID extraction ──────────────────────────────
+function extractId(url){
+  url=(url||'').trim();
+  let m=url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/); if(m) return m[1];
+  m=url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) return m[1];
+  if(/^[a-zA-Z0-9_-]{20,}$/.test(url)) return url;
+  return null;
+}
+function directUrl(id){ return `https://drive.google.com/uc?export=download&id=${id}`; }
+function embedUrl(id){ return `https://drive.google.com/file/d/${id}/preview`; }
+
+// ─── Play logic ───────────────────────────────────────
+function playUrl(url, title){
+  const id=extractId(url);
+  if(!id){ toast('❌ সঠিক Google Drive লিংক দিন!','err'); return false; }
+
+  title = title||'অজানা ভিডিও';
+  document.getElementById('ovTitle').textContent=title;
+  document.getElementById('npTitle').textContent=title;
+  document.getElementById('vph').style.display='none';
+  document.getElementById('fallbackNote').style.display='none';
+  document.getElementById('npDot').classList.remove('off');
+
+  // Try HTML5 first
+  tryHTML5(id, title, url);
+
+  // Save history
+  if(document.getElementById('cfgHist').checked){
+    hist=hist.filter(h=>h.url!==url);
+    hist.unshift({title,url,time:new Date().toLocaleString('bn-BD',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})});
+    if(hist.length>20) hist.pop();
+    renderHist();
+  }
+  return true;
+}
+
+function tryHTML5(id, title, origUrl){
+  const vid=document.getElementById('vid');
+  const ifrm=document.getElementById('ifrm');
+  const dUrl=directUrl(id);
+
+  vid.style.display='block';
+  ifrm.style.display='none';
+  currentMode='html5';
+  document.getElementById('npMode').textContent='HTML5';
+  document.getElementById('overlay').style.display='flex';
+
+  vid.src=dUrl;
+  vid.load();
+
+  if(document.getElementById('cfgAutoplay').checked) vid.play().catch(()=>{});
+  applyLoop();
+  vid.playbackRate=defSpeed;
+  document.getElementById('speedLabel').textContent=defSpeed+'×';
+  showOverlay();
+
+  // If error → fallback to iframe
+  vid.onerror=()=>{ fallbackIframe(id); };
+  // Also set a timeout — if metadata doesn't load in 5s, fallback
+  const fbTimer=setTimeout(()=>{ if(vid.readyState===0) fallbackIframe(id); },5000);
+  vid.onloadedmetadata=()=>{ clearTimeout(fbTimer); };
+}
+
+function fallbackIframe(id){
+  const vid=document.getElementById('vid');
+  const ifrm=document.getElementById('ifrm');
+  vid.style.display='none';
+  vid.src='';
+  ifrm.src=embedUrl(id);
+  ifrm.style.display='block';
+  currentMode='iframe';
+  document.getElementById('npMode').textContent='Iframe';
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('fallbackNote').style.display='block';
+  toast('⚠️ CORS block — iframe mode এ চলছে','warn');
+}
+
+// ─── Overlay show/hide ────────────────────────────────
+function showOverlay(){
+  const ov=document.getElementById('overlay');
+  ov.classList.add('vis');
+  clearTimeout(overlayTimer);
+  overlayTimer=setTimeout(()=>ov.classList.remove('vis'), 3500);
+}
+
+document.getElementById('vshell').addEventListener('click', e=>{
+  if(currentMode!=='html5') return;
+  if(e.target.closest('.ctrl-big,.ctrl-sm,.ov-btn,.prog-bar,.vol-bar,.speed-btn,.fs-btn')) return;
+  const ov=document.getElementById('overlay');
+  if(ov.classList.contains('vis')) ov.classList.remove('vis');
+  else showOverlay();
+});
+
+// ─── Playback controls ────────────────────────────────
+function togglePlay(){
+  const v=document.getElementById('vid');
+  if(!v.src||currentMode!=='html5') return;
+  v.paused ? v.play() : v.pause();
+  showOverlay();
+}
+
+function seekRel(s){
+  const v=document.getElementById('vid');
+  if(!v.duration) return;
+  v.currentTime=Math.max(0,Math.min(v.duration,v.currentTime+s));
+  showOverlay();
+}
+
+function cycleSpeed(){
+  speedIdx=(speedIdx+1)%speeds.length;
+  const s=speeds[speedIdx];
+  document.getElementById('vid').playbackRate=s;
+  document.getElementById('speedLabel').textContent=s+'×';
+  showOverlay();
+}
+
+function applyLoop(){
+  document.getElementById('vid').loop=document.getElementById('cfgLoop').checked;
+}
+
+// ─── Volume ───────────────────────────────────────────
+const vid=document.getElementById('vid');
+function toggleMute(){
+  vid.muted=!vid.muted;
+  document.getElementById('volIcon').textContent=vid.muted?'🔇':'🔊';
+  document.getElementById('volFill').style.width=vid.muted?'0%':(vid.volume*100)+'%';
+  showOverlay();
+}
+function volClick(e){
+  const bar=document.getElementById('volBar');
+  const r=bar.getBoundingClientRect();
+  const pct=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  vid.volume=pct; vid.muted=false;
+  document.getElementById('volFill').style.width=(pct*100)+'%';
+  document.getElementById('volIcon').textContent=pct<.05?'🔇':pct<.5?'🔉':'🔊';
+  showOverlay();
+}
+
+// ─── Progress ─────────────────────────────────────────
+function seekClick(e){
+  const bar=document.getElementById('progBar');
+  const r=bar.getBoundingClientRect();
+  const pct=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  if(vid.duration) vid.currentTime=pct*vid.duration;
+  showOverlay();
+}
+
+function fmtTime(s){
+  if(isNaN(s)||!isFinite(s)) return '0:00';
+  const m=Math.floor(s/60), ss=Math.floor(s%60);
+  return m+':'+(ss<10?'0':'')+ss;
+}
+
+vid.addEventListener('timeupdate',()=>{
+  if(!vid.duration) return;
+  const pct=(vid.currentTime/vid.duration)*100;
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progThumb').style.left=pct+'%';
+  document.getElementById('curTime').textContent=fmtTime(vid.currentTime);
+});
+
+vid.addEventListener('loadedmetadata',()=>{
+  document.getElementById('durTime').textContent=fmtTime(vid.duration);
+});
+
+vid.addEventListener('play',()=>{
+  document.getElementById('playIco').innerHTML='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+});
+vid.addEventListener('pause',()=>{
+  document.getElementById('playIco').innerHTML='<polygon points="5,3 19,12 5,21"/>';
+});
+
+vid.addEventListener('ended',()=>{
+  if(document.getElementById('cfgAutoNext').checked && activeIdx>=0 && activeIdx<playlist.length-1){
+    activeIdx++;
+    playItem(activeIdx);
+  }
+});
+
+// ─── Fullscreen ───────────────────────────────────────
+function toggleFs(){
+  const sh=document.getElementById('vshell');
+  if(!document.fullscreenElement){
+    (sh.requestFullscreen||sh.webkitRequestFullscreen||sh.mozRequestFullScreen).call(sh);
+  } else {
+    (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen).call(document);
+  }
+}
+function tryPiP(){
+  if(document.pictureInPictureEnabled && vid.readyState>0){
+    vid.requestPictureInPicture().catch(()=>toast('PiP সাপোর্ট নেই','err'));
+  } else toast('PiP শুধু HTML5 mode এ কাজ করে','err');
+}
+
+// ─── Play now ─────────────────────────────────────────
+function playNow(){
+  const url=document.getElementById('linkInp').value.trim();
+  const title=document.getElementById('titleInp').value.trim()||'অজানা ভিডিও';
+  if(!url){ toast('⚠️ লিংক দিন!','err'); return; }
+  if(playUrl(url,title)){
+    document.getElementById('linkInp').value='';
+    document.getElementById('titleInp').value='';
+  }
+}
+
+function playItem(idx){
+  const it=playlist[idx]; if(!it) return;
+  activeIdx=idx;
+  playUrl(it.url,it.title);
+  renderPL();
+  goTab('player');
+}
+
+// ─── Playlist ─────────────────────────────────────────
+function addPL(){
+  const url=document.getElementById('linkInp').value.trim();
+  const title=document.getElementById('titleInp').value.trim()||`ভিডিও ${playlist.length+1}`;
+  if(!url){ toast('⚠️ লিংক দিন!','err'); return; }
+  if(!extractId(url)){ toast('❌ সঠিক Drive লিংক দিন!','err'); return; }
+  playlist.push({title,url});
+  document.getElementById('linkInp').value='';
+  document.getElementById('titleInp').value='';
+  renderPL();
+  toast(`✓ "${title}" যোগ হয়েছে`,'ok');
+}
+
+function removePLi(i,e){
+  e.stopPropagation();
+  const n=playlist[i].title;
+  playlist.splice(i,1);
+  if(activeIdx===i) activeIdx=-1; else if(activeIdx>i) activeIdx--;
+  renderPL(); toast(`🗑 "${n}" মুছা হয়েছে`,'ok');
+}
+
+function clearPL(){
+  if(!playlist.length) return;
+  if(!confirm('পুরো Playlist মুছবেন?')) return;
+  playlist=[]; activeIdx=-1; renderPL(); toast('🗑 Playlist পরিষ্কার','ok');
+}
+
+function sortPL(){ playlist.sort((a,b)=>a.title.localeCompare(b.title,'bn')); renderPL(); toast('⇅ A–Z সাজানো','ok'); }
+
+function shufflePL(){
+  for(let i=playlist.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [playlist[i],playlist[j]]=[playlist[j],playlist[i]]; }
+  renderPL(); toast('🔀 Shuffle হয়েছে','ok');
+}
+
+function renderPL(){
+  const el=document.getElementById('pllist');
+  document.getElementById('plBadge').textContent=`${playlist.length} টি`;
+  if(!playlist.length){
+    el.innerHTML=`<div class="empty"><div class="ei">📂</div>Playlist খালি<br><small style="color:var(--tx3)">Player থেকে যোগ করুন</small></div>`;
+    return;
+  }
+  el.innerHTML=playlist.map((it,i)=>`
+    <div class="pli ${i===activeIdx?'on':''}" onclick="playItem(${i})">
+      <div class="pli-num ${i===activeIdx?'eq':''}">${i===activeIdx?'<div class="eqb"></div><div class="eqb"></div><div class="eqb"></div>':i+1}</div>
+      <div class="pli-info">
+        <div class="pli-name">${esc(it.title)}</div>
+        <div class="pli-url">${esc(it.url.substring(0,44))}…</div>
+      </div>
+      <button class="plidel" onclick="removePLi(${i},event)">✕</button>
+    </div>`).join('');
+}
+
+// ─── Export / Import ──────────────────────────────────
+function exportPL(){
+  if(!playlist.length){ toast('⚠️ Playlist খালি!','err'); return; }
+  const b=new Blob([JSON.stringify(playlist,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='playlist.json'; a.click();
+  toast('✓ Export সম্পন্ন','ok');
+}
+function showImp(){ document.getElementById('impbox').style.display='block'; }
+function hideImp(){ document.getElementById('impbox').style.display='none'; document.getElementById('impTA').value=''; }
+function doImport(){
+  try{
+    const d=JSON.parse(document.getElementById('impTA').value.trim());
+    if(!Array.isArray(d)) throw 0;
+    const v=d.filter(x=>x.url);
+    if(!v.length) throw 0;
+    playlist=[...playlist,...v.map(x=>({title:x.title||'Import ভিডিও',url:x.url}))];
+    renderPL(); hideImp(); toast(`✓ ${v.length} টি Import হয়েছে`,'ok');
+  } catch{ toast('❌ সঠিক JSON দিন!','err'); }
+}
+
+// ─── History ──────────────────────────────────────────
+function renderHist(){
+  const el=document.getElementById('hlist');
+  if(!hist.length){ el.innerHTML=`<div class="empty"><div class="ei">🕐</div>কোনো ইতিহাস নেই</div>`; return; }
+  el.innerHTML=hist.map((h,i)=>`
+    <div class="hi" onclick="playUrl('${esc(h.url)}','${esc(h.title)}')">
+      <div class="hi-ico">🎬</div>
+      <div class="hi-info">
+        <div class="hi-name">${esc(h.title)}</div>
+        <div class="hi-time">${esc(h.time)}</div>
+      </div>
+      <button class="hdel" onclick="delHist(${i},event)">✕</button>
+    </div>`).join('');
+}
+
+function delHist(i,e){ e.stopPropagation(); hist.splice(i,1); renderHist(); }
+function clearHist(){ if(!confirm('ইতিহাস মুছবেন?')) return; hist=[]; renderHist(); toast('🗑 ইতিহাস মুছা হয়েছে','ok'); }
+
+// ─── Settings helpers ─────────────────────────────────
+function setAc(c,el){
+  document.querySelectorAll('.copt').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+  document.documentElement.style.setProperty('--ac',c);
+}
+
+function setDefSpeed(s,el){
+  defSpeed=s;
+  document.querySelectorAll('.spopt').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+  if(currentMode==='html5'){ vid.playbackRate=s; document.getElementById('speedLabel').textContent=s+'×'; }
+}
+
+function resetAll(){
+  if(!confirm('সব ডেটা মুছবেন?')) return;
+  playlist=[]; hist=[]; activeIdx=-1;
+  renderPL(); renderHist(); toast('🔄 Reset সম্পন্ন','ok');
+}
+
+// ─── Toast ────────────────────────────────────────────
+let tt;
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`toast ${type} show`;
+  clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ─── Utils ────────────────────────────────────────────
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Enter key
+document.getElementById('linkInp').addEventListener('keydown',e=>{ if(e.key==='Enter') playNow(); });
+
+// Init
+renderHist(); renderPL();
+</script>
+</body>
+</html>
